@@ -38,5 +38,7 @@ Here is the running time in my i5-12500H machine with the 4032x3024 input Bayer 
 ## Thanks to
 
 [libraw](https://github.com/LibRaw/LibRaw): Library for reading and processing of RAW digicam images
+
 [openISP](https://github.com/cruxopen/openISP): Open Image Signal Processor (openISP)
+
 [fast-openISP](https://github.com/QiuJueqin/fast-openISP): Fast Open Image Signal Processor (fast-openISP)
