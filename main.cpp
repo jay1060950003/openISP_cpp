@@ -33,6 +33,7 @@ int main() {
     std::vector<float> parameter(iProcessor->imgdata.color.dng_levels.asshotneutral, iProcessor->imgdata.color.dng_levels.asshotneutral + 3);
     ushort CLIP = 4095;
     uchar cnf_thres = 60;
+    uchar bnr_size = 3;
     cv::Mat ccmatrix = cv::Mat(3, 4, CV_32F, iProcessor->imgdata.color.cmatrix)(cv::Rect(0, 0, 3, 3));
     float gamma = 0.42;
     float RGB2YUV420[3][4] = {
@@ -70,7 +71,8 @@ int main() {
     blc(raw, BAYER, black, white);              //BLC
     aaf(raw, aaf_kernel);                       //AAF
     wbgc(raw, BAYER, parameter, CLIP);          //WBGC
-    cnf(raw, BAYER, parameter, cnf_thres);      //CNF
+    //cnf(raw, BAYER, parameter, cnf_thres);      //CNF
+    bnr(raw, BAYER, bnr_size);
     cfa(raw, BAYER);                            //CFA
     ccm(raw, ccmatrix);                         //CCM
     gc(raw, gamma, CLIP);                       //GC
@@ -83,11 +85,14 @@ int main() {
     cv::Mat v = cv::Mat(cv::Size(raw.cols, raw.rows), CV_16U);
     csc(raw, y, u, v, RGB2YUV420);              //CSC
     nlm(y, nlm_dw, nlm_Dw, nlm_thres, CLIP);    //NLM
+    
     bnf(y, bnf_dw, bnf_rw, bnf_rthres, CLIP);   //BNF
     cv::Mat edge_map = cv::Mat(cv::Size(y.cols, y.rows), CV_16U);
     ee(y, edge_map, edge_filter, ee_thres, ee_gain, ee_emclip, CLIP);           //EE
+
+
     bcc(y, brightness, contrast, CLIP);                                         //BCC
-    fcs(u, v, edge_map, fcs_delta_min, fcs_delta_max, CLIP);                    //FCS
+    //fcs(u, v, edge_map, fcs_delta_min, fcs_delta_max, CLIP);                    //FCS，效果不好
     hsc(u, v, hue, saturation, CLIP);                                           //HSC
     yuv2rgb(raw, y, u, v);                                                      //2RGB
     raw.convertTo(raw, CV_8UC3);
@@ -98,8 +103,8 @@ int main() {
     cv::imwrite("result_u.png", u);
     v.convertTo(v, CV_8UC1);
     cv::imwrite("result_v.png", v);
-    edge_map.convertTo(edge_map, CV_8UC1);
-    cv::imwrite("result_edgemap.png", edge_map);
+    //edge_map.convertTo(edge_map, CV_8UC1);
+    //cv::imwrite("result_edgemap.png", edge_map);
 
     clock_t end = clock();    
     std::cout << "-------------------------------------------" << std::endl;

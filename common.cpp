@@ -1,5 +1,9 @@
 #include "common.h"
 
+int median(int a, int b, int c) {
+	return a >= b ? (b >= c ? b : (a >= c ? c : a)) : (a >= c ? a : (b >= c ? c : b));
+}
+
 cv::Mat padding(cv::Mat& img, uchar* pads)
 {
 	cv::Mat img_pad = cv::Mat(cv::Size(img.cols + pads[2] + pads[3], img.rows + pads[0] + pads[1]), img.type());

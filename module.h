@@ -18,6 +18,7 @@ void blc(cv::Mat&, std::string, float, float);
 void aaf(cv::Mat&, cv::Mat&);
 void wbgc(cv::Mat&, std::string, std::vector<float>, ushort);
 void cnf(cv::Mat&, std::string, std::vector<float>, uchar);
+void bnr(cv::Mat&, std::string, uchar);
 void cfa(cv::Mat&, std::string);
 void ccm(cv::Mat&, cv::Mat&);
 void gc(cv::Mat&, float, ushort);

@@ -6,7 +6,14 @@ void dpc(cv::Mat& src, uchar thres)
 	uchar pads[4] = { 2, 2, 2, 2 };
 	cv::Mat src_p = padding(src, pads);
 	ushort* p0, * p1, * p2, * p3, * p4, * p5, * p6, * p7, * p8, * p;
+	int grad_h1 = 0, grad_h2 = 0, grad_h3 = 0, grad_v1 = 0, grad_v2 = 0, grad_v3 = 0;
+	int grad_45_1 = 0, grad_45_2 = 0, grad_45_3 = 0, grad_135_1 = 0, grad_135_2 = 0, grad_135_3 = 0;
+	int grad_h = 0, grad_v = 0, grad_45 = 0, grad_135 = 0;
+	std::vector<int> gradient(4, 0);
+	int grad_sum = 0;
 	for (int i = 0; i < src_p.rows - 4; ++i) {
+		std::cout << "\r" << "DPC: ";
+		std::cout << std::setw(6) << std::fixed << std::setprecision(2) << (float)i / (src_p.rows - 2) * 100 << "%";
 		p0 = src_p.ptr<ushort>(i + 2);
 		p1 = src_p.ptr<ushort>(i);
 		p2 = src_p.ptr<ushort>(i);
@@ -18,34 +25,96 @@ void dpc(cv::Mat& src, uchar thres)
 		p8 = src_p.ptr<ushort>(i + 4);
 		p = src.ptr<ushort>(i);
 		for (int j = 0; j < src_p.cols - 4; j++) {
-			if ((p1[j] - p0[j + 2]) > thres && (p2[j + 2] - p0[j + 2]) > thres && (p3[j + 4] - p0[j + 2]) > thres
-				&& (p4[j] - p0[j + 2]) > thres && (p5[j + 4] - p0[j + 2]) > thres && (p6[j] - p0[j + 2]) > thres
-				&& (p7[j + 2] - p0[j + 2]) > thres && (p8[j + 4] - p0[j + 2]) > thres) {
-				std::vector<int> gradient = { abs(2 * p0[j + 2] - p2[j + 2] - p7[j + 2]),abs(2 * p0[j + 2] - p4[j] - p5[j + 4]),
-											 abs(2 * p0[j + 2] - p1[j] - p8[j + 4]), abs(2 * p0[j + 2] - p3[j + 4] - p6[j]) };
-				auto minPosition = std::min_element(gradient.begin(), gradient.end());
-				if (minPosition == gradient.begin()) {
-					p[j] = (p2[j + 2] + p7[j + 2] + 1) / 2;
-				}
-				else if (minPosition == gradient.begin() + 1)
-				{
-					p[j] = (p4[j] + p5[j + 4] + 1) / 2;
-				}
-				else if (minPosition == gradient.begin() + 2)
-				{
-					p[j] = (p1[j] + p8[j + 4] + 1) / 2;
+			grad_h1 = abs(p1[j] + p3[j + 4] - 2 * p2[j + 2]);
+			grad_h2 = abs(p4[j] + p5[j + 4] - 2 * p0[j + 2]);
+			grad_h3 = abs(p6[j] + p8[j + 4] - 2 * p7[j + 2]);
+			grad_v1 = abs(p1[j] + p4[j] - 2 * p6[j]);
+			grad_v2 = abs(p2[j + 2] + p7[j + 2] - 2 * p0[j + 2]);
+			grad_v3 = abs(p3[j + 4] + p8[j + 4] - 2 * p5[j + 4]);
+			grad_45_1 = 2 * abs(p2[j + 2] - p4[j]);
+			grad_45_2 = abs(p3[j + 4] + p6[j] - 2 * p0[j + 2]);
+			grad_45_3 = 2 * abs(p5[j + 4] - p7[j + 2]);
+			grad_135_1 = 2 * abs(p2[j + 2] -p5[j + 4]);
+			grad_135_2 = abs(p1[j] + p8[j + 4] - 2 * p0[j + 2]);
+			grad_135_3 = 2 * abs(p4[j] - p7[j + 2]);
+
+			grad_h = median(grad_h1, grad_h2, grad_h3);
+			grad_v = median(grad_v1, grad_v2, grad_v3);
+			grad_45 = median(grad_45_1, grad_45_2, grad_45_3);
+			grad_135 = median(grad_135_1, grad_135_2, grad_135_3);
+			gradient = { grad_h, grad_v, grad_45, grad_135 };
+			auto minPosition = std::min_element(gradient.begin(), gradient.end());
+			if (minPosition == gradient.begin() && grad_h2 > 4*(grad_h1+grad_h3))
+			{
+				if (abs(p4[j] - p0[j + 2]) < abs(p0[j + 2] - p5[j + 4])) {
+					p[j] = p4[j] + (p2[j + 2] + p7[j + 2] - p1[j] - p6[j]) / 2;
 				}
 				else {
-					p[j] = (p3[j + 4] + p6[j] + 1) / 2;
+					p[j] = p5[j + 4] + (p2[j + 2] + p7[j + 2] - p3[j + 4] - p8[j + 4]) / 2;
 				}
 			}
-			else {
-				p[j] = p0[j + 2];
+			if (minPosition == gradient.begin()+1 && grad_v2 > 4 * (grad_v1 + grad_v3))
+			{
+				if (abs(p2[j + 2] - p0[j + 2]) < abs(p0[j + 2] - p7[j + 2])) {
+					p[j] = p2[j + 2] + (p4[j] + p5[j + 4] - p1[j] - p3[j + 4]) / 2;
+				}
+				else {
+					p[j] = p7[j + 2] + (p4[j] + p5[j + 4] - p6[j] - p8[j + 4]) / 2;
+				}
 			}
+			if (minPosition == gradient.begin()+2)
+			{
+				grad_sum = abs(grad_135_1 - grad_135_2) + abs(grad_135_1 - grad_135_3) + abs(grad_135_2 - grad_135_3);
+				if (grad_sum > 100) {
+					if (grad_45_2 > 3 * (grad_45_1 + grad_45_3) && grad_135_2 > 3 * (grad_135_1 + grad_135_3)) {
+						if (abs(p3[j + 4] - p0[j + 2]) < abs(p0[j + 2] - p6[j])) {
+							p[j] = p3[j + 4] + (p4[j] + p7[j + 2] - p2[j + 2] - p5[j + 4]) / 2;
+						}
+						else {
+							p[j] = p6[j] - (p4[j] + p7[j + 2] - p2[j + 2] - p5[j + 4]) / 2;
+						}
+					}
+				}
+				else {
+					if (grad_45_2 > 3 * (grad_45_1 + grad_45_3)) {
+						if (abs(p3[j + 4] - p0[j + 2]) < abs(p0[j + 2] - p6[j])) {
+							p[j] = p3[j + 4] + (p4[j] + p7[j + 2] - p2[j + 2] - p5[j + 4]) / 2;
+						}
+						else {
+							p[j] = p6[j] - (p4[j] + p7[j + 2] - p2[j + 2] - p5[j + 4]) / 2;
+						}
+					}
+				}
+			}
+			if (minPosition == gradient.begin()+3)
+			{
+				grad_sum = abs(grad_45_1 - grad_45_2) + abs(grad_45_1 - grad_45_3) + abs(grad_45_2 - grad_45_3);
+				if (grad_sum > 100) {
+					if (grad_135_2 > 3 * (grad_135_1 + grad_135_3) && grad_45_2 > 3 * (grad_45_1 + grad_45_3)) {
+						if (abs(p1[j] - p0[j + 2]) < abs(p0[j + 2] - p8[j + 4])) {
+							p[j] = p1[j] + (p5[j + 4] + p6[j] - p2[j + 2] - p4[j]) / 2;
+						}
+						else {
+							p[j] = p8[j + 4] - (p5[j + 4] + p6[j] - p2[j + 2] - p4[j]) / 2;
+						}
+					}
+				}
+				else {
+					if (grad_135_2 > 3 * (grad_135_1 + grad_135_3)) {
+						if (abs(p1[j] - p0[j + 2]) < abs(p0[j + 2] - p8[j + 4])) {
+							p[j] = p1[j] + (p5[j + 4] + p6[j] - p2[j + 2] - p4[j]) / 2;
+						}
+						else {
+							p[j] = p8[j + 4] - (p5[j + 4] + p6[j] - p2[j + 2] - p4[j]) / 2;
+						}
+					}
+				}
+			}
+
 		}
 	}
 	clock_t end = clock();
-	std::cout << "DPC Done! Elapsed " << double(end - begin) / CLOCKS_PER_SEC * 1000 << " ms." << std::endl;
+	std::cout << "\r" << "DPC Done! Elapsed " << double(end - begin) / CLOCKS_PER_SEC * 1000 << " ms." << std::endl;
 }
 
 void blc(cv::Mat& src, std::string bayer_pattern, float black_level, float white_level)
@@ -105,6 +174,19 @@ void wbgc(cv::Mat& src, std::string bayer_pattern, std::vector<float> gain, usho
 	clock_t end = clock();
 	std::cout << "AWB Done! Elapsed " << double(end - begin) / CLOCKS_PER_SEC * 1000 << " ms." << std::endl;
 }
+
+void bnr(cv::Mat& src, std::string bayer_pattern, uchar ksize) {
+	clock_t begin = clock();
+	std::vector<cv::Mat> rggb = split_bayer(src, bayer_pattern);
+	medianBlur(rggb[0], rggb[0], ksize);
+	medianBlur(rggb[1], rggb[1], ksize);
+	medianBlur(rggb[2], rggb[2], ksize);
+	medianBlur(rggb[3], rggb[3], ksize);
+	src = reconstruct_bayer(rggb, bayer_pattern);
+	clock_t end = clock();
+	std::cout  << "BNF Done! Elapsed " << double(end - begin) / CLOCKS_PER_SEC * 1000 << " ms." << std::endl;
+}
+
 
 void cnf(cv::Mat& src, std::string bayer_pattern, std::vector<float> gain, uchar thres)
 {
