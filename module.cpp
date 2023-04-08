@@ -187,69 +187,6 @@ void bnr(cv::Mat& src, std::string bayer_pattern, uchar ksize) {
 	std::cout  << "BNF Done! Elapsed " << double(end - begin) / CLOCKS_PER_SEC * 1000 << " ms." << std::endl;
 }
 
-
-void cnf(cv::Mat& src, std::string bayer_pattern, std::vector<float> gain, uchar thres)
-{
-	gain = { 1 / gain[0] * 1024, 1 / gain[1] * 1024, 1 / gain[2] * 1024 };
-	clock_t begin = clock();
-	std::vector<cv::Mat> rggb = split_bayer(src, bayer_pattern);
-	uchar pads[4] = { 4, 4, 4, 4 };
-	cv::Mat src_p = padding(src, pads);
-	std::vector<cv::Mat> rggb_pad = split_bayer(src_p, bayer_pattern);
-	ushort* R, * B, chroma_corrected = 0;
-	float avg_r = 0, avg_g = 0, avg_b = 0, y = 0, fade1 = 0, fade = 0, damp_factor_r = 0, damp_factor_b = 0, max_avg = 0;
-
-	if (gain[0] <= 1024)	damp_factor_r = 256;
-	else if (gain[0] <= 1229)	damp_factor_r = 128;
-	else damp_factor_r = 77;
-
-	if (gain[2] <= 1024)	damp_factor_b = 256;
-	else if (gain[2] <= 1229)	damp_factor_b = 128;
-	else damp_factor_b = 77;
-	for (int i = 0; i < rggb[0].rows; ++i) {
-		std::cout << "\r" << "CNF: ";
-		std::cout << std::setw(8) << std::fixed << std::setprecision(2) << (float)i / rggb[0].rows * 100 << "%";
-		R = rggb[0].ptr<ushort>(i);
-		B = rggb[3].ptr<ushort>(i);
-		for (int j = 0; j < rggb[0].cols; ++j) {
-			avg_r = sum_cvMat(rggb_pad[0](cv::Rect(j, i, 5, 5))) / 25.0;
-			avg_g = sum_cvMat(rggb_pad[1](cv::Rect(j, i, 5, 5))) / 50.0 + sum_cvMat(rggb_pad[2](cv::Rect(j, i, 5, 5))) / 50.0;
-			avg_b = sum_cvMat(rggb_pad[3](cv::Rect(j, i, 5, 5))) / 25.0;
-
-			y = (306.0 * avg_r + 601.0 * avg_g + 117.0 * avg_b) / 1024.0;
-			fade1 = cnf_fade(y, 'y');
-
-			// r_noise
-			if ((R[j] - avg_g) > thres && (R[j] - avg_b) > thres && (avg_r - avg_g) > thres && (avg_r - avg_b) < thres) {
-				if (avg_g > avg_b) {
-					max_avg = avg_g;
-				}
-				else {
-					max_avg = avg_b;
-				}
-				chroma_corrected = max_avg + (damp_factor_r * R[j] - max_avg) / 256;
-				fade = fade1 * cnf_fade(avg_r, 'r');
-				R[j] = ushort(fade * chroma_corrected + (1 - fade) * R[j]);
-			}
-			// b_noise
-			if ((B[j] - avg_g) > thres && (B[j] - avg_r) > thres && (avg_b - avg_g) > thres && (avg_b - avg_r) < thres) {
-				if (avg_g > avg_r) {
-					max_avg = avg_g;
-				}
-				else {
-					max_avg = avg_r;
-				}
-				chroma_corrected = max_avg + (damp_factor_b * B[j] - max_avg) / 256;
-				fade = fade1 * cnf_fade(avg_b, 'b');
-				B[j] = ushort(fade * chroma_corrected + (1 - fade) * B[j]);
-			}
-		}
-	}
-	src = reconstruct_bayer(rggb, bayer_pattern);
-	clock_t end = clock();
-	std::cout << "\r" << "CNF Done! Elapsed " << double(end - begin) / CLOCKS_PER_SEC * 1000 << " ms." << std::endl;
-}
-
 void cfa(cv::Mat& src, std::string bayer_pattern)
 {
 	clock_t begin = clock();
@@ -271,7 +208,6 @@ void cfa(cv::Mat& src, std::string bayer_pattern)
 	clock_t end = clock();
 	std::cout << "CFA Done! Elapsed " << double(end - begin) / CLOCKS_PER_SEC * 1000 << " ms." << std::endl;
 }
-
 
 void ccm(cv::Mat& src, cv::Mat& ccm)
 {
@@ -386,15 +322,15 @@ void nlm(cv::Mat& src, uchar ds, uchar Ds, uchar h, uchar clip)
 	std::cout << "\r"  << "NLM Done! Elapsed " << double(end - begin) / CLOCKS_PER_SEC * 1000 << " ms." << std::endl;
 }
 
-void bnf(cv::Mat& src, float bnf_dw[5][5], uchar* bnf_rw, uchar* bnf_rthres, ushort clip)
+void bnf(cv::Mat& src, uchar sigmoid_s, uchar sigmoid_p, ushort clip)
 {
 	clock_t begin = clock();
 
 	uchar pads[4] = { 2, 2, 2, 2 };
 	cv::Mat src_p = padding(src, pads);
 	int sum_weight = 0, sum_imgA = 0;
-	ushort pixel_center = 0, rdiff = 0;
-	double dive = .0;
+	ushort pixel_center = 0;
+	double dive = .0, w = .0;
 	ushort* p, * p_p;
 
 	for (int y = 0; y < src_p.rows - 4; ++y) {
@@ -409,25 +345,9 @@ void bnf(cv::Mat& src, float bnf_dw[5][5], uchar* bnf_rw, uchar* bnf_rthres, ush
 			for (int i = 0; i < 5; ++i) {
 				p_p = src_p.ptr<ushort>(y + i);
 				for (int j = 0; j < 5; ++j) {
-					rdiff = abs(p_p[x + j] - pixel_center);
-					if (rdiff >= bnf_rthres[0]) {
-						rdiff = bnf_rw[0];
-					}
-					else{
-						if (rdiff < bnf_rthres[0] && rdiff > bnf_rthres[1]) {
-							rdiff = bnf_rw[1];
-						}
-						else{
-							if (rdiff < bnf_rthres[0] && rdiff > bnf_rthres[2]){
-								rdiff = bnf_rw[2];
-							}
-							else{
-								rdiff = bnf_rw[3];
-							}
-						}
-					}
-					sum_imgA += (p_p[x+j] * rdiff * bnf_dw[i][j]);
-					sum_weight += (rdiff * bnf_dw[i][j]);
+					w = exp(-((abs(p_p[x + j] - pixel_center)) ^ 2) / 2 / sigmoid_p ^ 2) * exp(-((2 - i) ^ 2 + (2 - j) ^ 2) / 2 / sigmoid_s);
+					sum_imgA += p_p[x + j] * w;
+					sum_weight += w;
 				}
 			}
 			dive = sum_imgA / sum_weight;
@@ -439,38 +359,7 @@ void bnf(cv::Mat& src, float bnf_dw[5][5], uchar* bnf_rw, uchar* bnf_rthres, ush
 	std::cout << "\r" << "BNF Done! Elapsed " << double(end - begin) / CLOCKS_PER_SEC * 1000 << " ms." << std::endl;
 }
 
-double emlut(double val, uchar* thres, uchar* gain, char* clip)
-{
-	double lut = .0;
-	if (val < -thres[1]) {
-		lut = gain[1] * val;
-	}
-	else{
-		if (val < -thres[0] && val > -thres[1]) {
-			lut = .0;
-		}
-		else
-		{
-			if (val < thres[0] && val > -thres[1]) {
-				lut = gain[0] * val;
-			}
-			else
-			{
-				if (val > thres[0] && val < thres[1]) {
-					lut = .0;
-				}
-				else
-				{
-					if (val > thres[1])	lut = gain[1] * val;
-				}
-			}
-		}
-	}
-	lut = MAX(clip[0], MIN(lut / 256, clip[1]));
-	return lut;
-}
-
-void ee(cv::Mat& src, cv::Mat& edgemap, char edge_filter[3][5], uchar* ee_thres, uchar* ee_gain, char* ee_emclip, ushort clip)
+void ee(cv::Mat& src, cv::Mat& edgemap, char edge_filter[3][5], ushort clip)
 {
 	 clock_t begin = clock();
 
@@ -490,8 +379,8 @@ void ee(cv::Mat& src, cv::Mat& edgemap, char edge_filter[3][5], uchar* ee_thres,
 					em_img += src_p.ptr<ushort>(y + i)[x + j] * edge_filter[i][j];
 				}
 			}
-			em_img = em_img / 8.0;
-			ee_img = src_p.ptr<ushort>(y + 1)[x + 2] + emlut(em_img, ee_thres, ee_gain, ee_emclip);
+			em_img = em_img / 8;
+			ee_img = src_p.ptr<ushort>(y + 1)[x + 2] + em_img;
 			ee_img = (ee_img < 0) ? 0 : (ee_img > clip ? clip : ee_img);
 			p_edgemap[x] = (ushort)em_img;
 			p_src[x] = (ushort)ee_img;
@@ -518,65 +407,6 @@ void bcc(cv::Mat& src, uchar brightness, uchar contrast, ushort bcc_clip)
 	}
 	clock_t end = clock();
 	std::cout << "BCC Done! Elapsed " << double(end - begin) / CLOCKS_PER_SEC * 1000 << " ms." << std::endl;
-}
-
-void fcs(cv::Mat& src_u, cv::Mat& src_v, cv::Mat& edgemap, uchar fcs_delta_min , uchar fcs_delta_max, ushort clip)
-{
-	clock_t begin = clock();
-	double threshold_delta = fcs_delta_max - fcs_delta_min;
-	threshold_delta = (threshold_delta < 1e-6) ? 1e-6 : threshold_delta;
-	int slope = -(65536 / threshold_delta);
-
-	ushort* p_u, * p_v, * p_edgemap;
-	ushort pixel_u = 0, pixel_v = 0, pixel_edgemap = 0;
-	int gain_map = 0;
-	for (int y = 0; y < src_u.rows; ++y) {
-		p_u = src_u.ptr<ushort>(y);
-		p_v = src_v.ptr<ushort>(y);
-		p_edgemap = edgemap.ptr<ushort>(y);
-		for (int x = 0; x < src_u.cols; ++x) {
-			pixel_u = p_u[x];
-			pixel_v = p_v[x];
-			gain_map = slope * (abs(p_edgemap[x]) - fcs_delta_max);
-			gain_map = gain_map < 0 ? 0 : (gain_map > 65536 ? 65536 : gain_map);
-			pixel_u = (pixel_u - 128) * gain_map / 65536 + 128;
-			pixel_v = (pixel_v - 128) * gain_map / 65536 + 128;
-			pixel_u = (pixel_u < 0) ? 0 : (pixel_u > clip ? clip : pixel_u);
-			pixel_v = (pixel_v < 0) ? 0 : (pixel_v > clip ? clip : pixel_v);
-			p_u[x] = pixel_u;
-			p_v[x] = pixel_v;
-		}
-	}
-	clock_t end = clock();
-	std::cout << "FCS Done! Elapsed " << double(end - begin) / CLOCKS_PER_SEC * 1000 << " ms." << std::endl;
-}
-
-void hsc(cv::Mat& src_u, cv::Mat& src_v, uchar hue, ushort saturatin, ushort clip)
-{
-	clock_t begin = clock();
-	std::vector<ushort> lut_sin{}, lut_cos{};
-	for (int i = 0; i < 360; ++i) {
-		lut_sin.push_back(round(sin(i * 3.1415926 / 180) * 256.0));
-		lut_cos.push_back(round(cos(i * 3.1415926 / 180) * 256.0));
-	}
-	ushort* p_u, * p_v;
-	ushort pixel_u, pixel_v;
-	for (int y = 0; y < src_u.rows; ++y) {
-		p_u = src_u.ptr<ushort>(y);
-		p_v = src_v.ptr<ushort>(y);
-		for (int x = 0; x < src_u.cols; ++x) {
-			pixel_u = (p_u[x] - 128) * lut_cos[hue] + (p_v[x] - 128) * lut_sin[hue] + 128;
-			pixel_v = (p_v[x] - 128) * lut_cos[hue] + (p_u[x] - 128) * lut_sin[hue] + 128;
-			pixel_u = saturatin * (p_u[x] - 128) / 256.0 + 128;
-			pixel_v = saturatin * (p_v[x] - 128) / 256.0 + 128;
-			pixel_u = pixel_u < 0 ? 0 : (pixel_u > clip ? clip : pixel_u);
-			pixel_v = pixel_v < 0 ? 0 : (pixel_v > clip ? clip : pixel_v);
-			p_u[x] = pixel_u;
-			p_v[x] = pixel_v;
-		}
-	}
-	clock_t end = clock();
-	std::cout << "HSC Done! Elapsed " << double(end - begin) / CLOCKS_PER_SEC * 1000 << " ms." << std::endl;
 }
 
 void yuv2rgb(cv::Mat& src, cv::Mat& y, cv::Mat& u, cv::Mat& v)

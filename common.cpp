@@ -99,28 +99,3 @@ cv::Mat reconstruct_bayer(std::vector<cv::Mat>& sub_arrays, std::string& bayer_p
 	}
 	return bayer_array;
 }
-
-float cnf_fade(float& i, char c)
-{
-	if (i <= 30)	return 1.0;
-	else if (i <= 50)	return 0.9;
-	else if (i <= 70)	return 0.8;
-	else if (i <= 100)	return 0.7;
-	else if (i <= 150)	return 0.6;
-	else if (i <= 200)	return 0.3;
-	else if (c = 'y' && i <= 250)	return 0.1;
-	else return 0.0f;
-}
-
-float sum_cvMat(cv::Mat m)
-{
-	float sum = 0.0;
-	ushort* p;
-	for (int i = 0; i < m.rows; ++i) {
-		p = m.ptr<ushort>(i);
-		for (int j = 0; j < m.cols; ++j) {
-			sum += p[j];
-		}
-	}
-	return sum;
-}

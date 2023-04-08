@@ -1,5 +1,6 @@
 # openISP_cpp
 Open Image Signal Processor
+You can found the description in [Practice record](https://jay1060950003.github.io/2022/11/02/isp_pipeline%E7%BB%83%E4%B9%A0%E5%AE%9E%E5%BD%95/)
 
 ## Introduction
 
@@ -9,21 +10,22 @@ Here is the running time in my i5-12500H machine with the 4032x3024 input Bayer 
 
 |Module             |openISP(1920x1080) |cpp(4032x3024)|
 |:-----------------:|:------:|:----------:|
-|DPC                |20.57s  |0.37s       |
-|BLC                |11.75s  |0.42s       |
-|AAF                |16.87s  |0.59s       |
-|AWB                |7.54s   |0.45s       |
-|CNF                |73.99s  |2.62s       |
-|CFA                |40.71s  |0.07s       |
-|CCM                |56.85s  |1.08s       |
-|GAC                |25.71s  |0.68s       |
-|CSC                |60.32s  |0.35s       |
-|NLM                |1600.95s|12.34s       |
-|BNF                |801.24s |3.62s       |
+|DPC                |20.57s  |17.8s       |
+|BLC                |11.75s  |0.38s       |
+|AAF                |16.87s  |0.52s       |
+|AWB                |7.54s   |0.41s       |
+|CNF                |73.99s  |-----       |
+|BNF                |------  |1.16s       |
+|CFA                |40.71s  |0.05s       |
+|CCM                |56.85s  |0.93s       |
+|GAC                |25.71s  |0.61s       |
+|CSC                |60.32s  |0.34s       |
+|NLM                |1600.95s|12.55s      |
+|BNF                |801.24s |8.18s       |
 |EEH                |68.60s  |1.65s       |
-|FCS                |25.07s  |0.08s       |
-|HSC                |56.34s  |0.22s       |
-|End-to-end pipeline|2894.41s|28.28s       |
+|FCS                |25.07s  |-----       |
+|HSC                |56.34s  |-----       |
+|End-to-end pipeline|2894.41s|47.99s       |
 
 ## Usage
 
