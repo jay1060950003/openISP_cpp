@@ -6,10 +6,10 @@
 #include "module.h"
 
 int main() {
-    cv::utils::logging::setLogLevel(cv::utils::logging::LOG_LEVEL_ERROR);   // 只输出错误日志
+    cv::utils::logging::setLogLevel(cv::utils::logging::LOG_LEVEL_ERROR);
     clock_t begin = clock();
 
-    const char* file = "IMG_1.dng";
+    const char* file = "IMG.dng";
     // open dng file
     LibRaw* iProcessor = new LibRaw;    
     iProcessor->open_file(file);

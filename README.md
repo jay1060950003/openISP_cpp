@@ -30,7 +30,7 @@ Here is the running time in my i5-12500H machine with the 4032x3024 input Bayer 
 ## Usage
 
 1. Clone this repo
-2. Compile (I use vs2019 which configured `opencv4.6.0`)
+2. Compile (I use `cmake` to compile the code with `MSYS2`, `MinGW64`, `LibRaw` and `OpenCV`)
 3. Adjust the path and parameters of the code, than you can do the pipeline
 
 **Note:**
