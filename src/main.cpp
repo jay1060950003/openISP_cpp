@@ -9,7 +9,7 @@ int main() {
     cv::utils::logging::setLogLevel(cv::utils::logging::LOG_LEVEL_ERROR);
     clock_t begin = clock();
 
-    const char* file = "IMG.dng";
+    const char* file = "img.dng";
     // open dng file
     LibRaw* iProcessor = new LibRaw;    
     iProcessor->open_file(file);
